@@ -1,21 +1,17 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#include<unordered_map>
-#include<vector>
+#include <unordered_map>
+#include <vector>
+#include "../calibration/calibration.h"
 /**
- * ilk olarak bizim butonlardan aldığımız değerler olacak
- * bu değerleri normal butondan alıyormuşuz gibi alacağız
- * yani event muamelesi yapacağız
+ * evet planda bir değişiklik var
+ * InputManager diye bir class lazım. bu class da olması gereken fonksiyonlar : 
+ * update();
+ * getWheerSteer(); [-1, 1]
+ * get...() [-1, 1]
  * 
- * diğer bir girdi de direksiyonun yönü pedallardan gelen % lik değerler olacak bir de
- * bu değerler'in herbiri için get...Value gibi fonksiyon yazacağız, bunlar için başka bir hash tutabilirmiyiz?
- * zaten bunlar için static bir hash tutmamıza gerek yok? çünkü fix şeyler
  * 
- * Input namespace inin ismi ne olacak? bilmiyorum... : HardwareInput
- * 
- * şimdi sırada class mı yazacaz c tarzı mı olacak?
- * tabii class yazacaz!
  */
 
 namespace HardwareInput
@@ -34,6 +30,7 @@ namespace HardwareInput
 
     /**
      * yine butonlardan gelen veri için map
+     * şimdilik buton kullanılmayacak
      */
     // std::unordered_map<Action, std::vector</** Irrlich girdi türü */> keyMap =
     // {
@@ -44,19 +41,40 @@ namespace HardwareInput
     //     {Action::GearDown,  {...}}
     // };
 
-    std::unordered_map<Action, bool> curr;
-    std::unordered_map<Action, bool> prev;
+    // std::unordered_map<Action, bool> curr;
+    // std::unordered_map<Action, bool> prev;
 
     class Input
     {
-    private:
+    public:
         float wheelSteer = 0.0f;
         float brakePedal = 0.0f;
-        float throttlePedal = 0.0f;
+        float GasPedal = 0.0f;
+
+        float getWheelSteer() { return wheelSteer; }
+        float getBrakePedal() { return brakePedal; }
+        float getGasPedal()   { return GasPedal; }
+
+        void setInput(float wheelSteer, float brakePedal, float GasPedal)
+        {
+            this->wheelSteer = wheelSteer;
+            this->brakePedal = brakePedal;
+            this->GasPedal = GasPedal;
+        }
+    };
+
+    class InputManager
+    {
+    private:
+        clb::InputAxis calibrateValue;
     public:
+        InputManager() = default;
+        InputManager(clb::InputAxis ia) : calibrateValue(ia) {}
+
+        void update();
         float getWheelSteer();
         float getBrakePedal();
-        float getThrottlePedal();
+        float getGasPedal();
     };
 }
 
