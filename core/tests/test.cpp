@@ -27,10 +27,10 @@ int main()
 
         if (ffAktif)
         {
-            if(steer < -0.5) ff.SetForce(-6.5f);
-            else ff.SetForce(0);
+            if(steer < -0.5) ff.SetForce(-6.5f, 50);
+            else ff.SetForce(0, 50);
         }
-        else ff.SetForce(0);
+        else ff.SetForce(0, 50);
 
         BeginDrawing();
             ClearBackground(RAYWHITE);
@@ -43,7 +43,7 @@ int main()
             }
             else
             {
-                DrawText("FF DURUMU: HATA! (Sudo ile calistirdin mi?)", 50, 100, 20, RED);
+                DrawText("FF DURUMU: HATA!", 50, 100, 20, RED);
             }
 
             DrawText(TextFormat("Direksiyon Acisi: %.2f", steer), 50, 150, 20, BLACK);
