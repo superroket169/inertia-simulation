@@ -118,7 +118,7 @@ int main()
             startY += 140;
             GuiLabel((Rectangle){ (float)startX, (float)startY, 200, 20 }, "Vibration / Rumble");
             GuiSlider((Rectangle){ (float)startX, (float)startY + 30, 200, 20 }, "Strength", NULL, &vibrationStr, 0.0f, 1.0f);
-            GuiSlider((Rectangle){ (float)startX, (float)startY + 60, 200, 20 }, "Frequency", NULL, &vibrationFreq, 1.f, 20.0f);
+            GuiSlider((Rectangle){ (float)startX, (float)startY + 60, 200, 20 }, "Frequency", NULL, &vibrationFreq, 1.f, 40.0f);
             
             if (GuiButton((Rectangle){ (float)startX + 220, (float)startY + 45, 100, 30 }, "STOP VIB")) {
                 vibrationStr = 0.0f;

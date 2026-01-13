@@ -79,8 +79,8 @@ namespace HardwareInput
         void updateFeedBacks();
 
         float getWheelSteer() { return calibratedInput.getWheelSteer(); };                  // [-1, 0]
-        float getBrakePedal() { return (calibratedInput.getBrakePedal() + 1.0f) / 2.0f; };  // [0, 1]
-        float getGasPedal()   { return (calibratedInput.getGasPedal() + 1.0f) / 2.0f; };    // [0, 1]
+        float getBrakePedal() { return 1 - (calibratedInput.getBrakePedal() + 1.0f) / 2.0f; };  // [0, 1]
+        float getGasPedal()   { return 1 - (calibratedInput.getGasPedal() + 1.0f) / 2.0f; };    // [0, 1]
 
         void setCalibrationValueX(clb::InputAxis calibrateValue) { this->calibrateX = calibrateValue; }
         void setCalibrationValueY(clb::InputAxis calibrateValue) { this->calibrateY = calibrateValue; }

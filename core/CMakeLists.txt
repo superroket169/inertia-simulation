@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(raylib REQUIRED)
 
 add_executable(test 
-    tests/test.cpp
+    tests/testRender.cpp
     src/input/Input.cpp
 )
 

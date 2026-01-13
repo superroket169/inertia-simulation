@@ -22,7 +22,7 @@ void HardwareInput::InputManager::updateFeedBacks()
 
     float currentSteer = getWheelSteer();
     float finalForce = 0.0f;
-    float wallStiffness = 5.0f; // sınır kuvveti
+    float wallStiffness = 9.0f; // sınır kuvveti
 
     // sınır algılaması / kontrolü
     if (currentSteer > wheelRightLimit) // sağ
@@ -47,7 +47,7 @@ void HardwareInput::InputManager::updateFeedBacks()
             // self centring
             if (selfCentring && wheelConstantForce == 0)
             {
-                finalForce = currentSteer * 0.5f; 
+                finalForce = currentSteer * 0.6f; 
             }
         }
 
