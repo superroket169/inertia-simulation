@@ -7,6 +7,7 @@ find_package(raylib REQUIRED)
 
 add_executable(test 
     tests/test.cpp
+    src/input/Input.cpp
 )
 
 target_link_libraries(test raylib)

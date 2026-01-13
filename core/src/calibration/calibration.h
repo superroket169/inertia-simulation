@@ -1,39 +1,11 @@
 #ifndef CALIBRATION_H
 #define CALIBRATION_H
-/**
- * plan : 
- * ilk önce dummy değerlerimiz olacak : calibrationValue dakiler
- * eğer kalibrasyon yapılmazsa bu değerler kabul edilecek
- * kalibrasyon nasıl yapılacak : 
- * 
- * - class calibratedValue 
- * diye birşeyimiz olabilir
- * bu init yaptıktan sonra .calibrateTop..Bottom..Mid(float second);
- * yaptığımızda second saniye kadar değerlere göre dummy değerleri değiştirecek& kalibre edecek
- * 
- * bundan sonra input classında :
- * class InputChannel 
- * gibi birşey olacak. bu sayede bu class ile 
- * InputChannel ch; ch.setCallib(class callibratedValue); 
- * şeklinde initilation yapabiliriz
- * bundan sonra bu channel dan şu şekilde değer alacağız : 
- * ch.getWheelValue();
- * ch.getGasPedalValue();
- * cg.getBrakePedalValue();
- * şeklinde.
- * bunlar valibration değerine uygun bir şekilde
- * [-1, 1] aralığında bir değer gönderecek. 
- */
 
-/**
- * 
- */
-
-#include<algorithm>
+#include <algorithm>
+#include <cmath>
 
 namespace clb
 {
-    // her axis için Input class i
     class InputAxis
     {
     private:
@@ -43,44 +15,46 @@ namespace clb
         bool isCalibrated;
 
     public:
+        InputAxis() : rawMax(1.0f), rawMin(-1.0f), center(0.0f), isCalibrated(false) {}
 
-        InputAxis() : rawMax(-1), rawMin(1), center(0), isCalibrated(false) {}
         InputAxis(float rawMax, float rawMin)
         {
             this->rawMax = rawMax;
             this->rawMin = rawMin;
-            this->center = (rawMin - rawMax) / 2;
+            this->center = (rawMin + rawMax) / 2.0f;
+        }
+        
+        void resetForCalibration()
+        {
+            rawMin = 10000.0f;  // tam ters şekilde reset için
+            rawMax = -10000.0f; // tam ters şekilde reset için
+            isCalibrated = false;
         }
 
-        // basit calibrate fonksiyonu
         float calibrateValues(float currentRawValue)
         {
-            float debugValue = 0.f;
-            if (currentRawValue < rawMin)
-            {
-                debugValue = rawMin - currentRawValue;
-                rawMin = currentRawValue;
-            }
-
-            if (currentRawValue > rawMax)
-            {
-                debugValue = rawMax - currentRawValue;
-                rawMax = currentRawValue;
-            }
-
-            return debugValue;
+            if (currentRawValue < rawMin) rawMin = currentRawValue;
+            if (currentRawValue > rawMax) rawMax = currentRawValue;
+            
+            center = (rawMin + rawMax) / 2.0f;
+            isCalibrated = true;
+            
+            return currentRawValue;
         }
 
         float getNormalizedValue(float currentRawValue)
         {
+            // max ve min eşitse basit koruma 
+            if (std::abs(rawMax - rawMin) < 0.0001f) return 0.0f;
+
+            // değerleri sınırlar içerisinde tutmak
             if (currentRawValue < rawMin) currentRawValue = rawMin;
             if (currentRawValue > rawMax) currentRawValue = rawMax;
 
-            float temp = (float)(currentRawValue - rawMin) / (rawMax - rawMin);
-            
-            return (temp * 2.0f) - 1.0f;
+            // normalizasyon
+            float t = (currentRawValue - rawMin) / (rawMax - rawMin);
+            return (t * 2.0f) - 1.0f;
         }
-
     };
 }
 
