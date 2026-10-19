@@ -21,7 +21,7 @@
 
 // ---- Control loop ----
 
-#define CONTROL_HZ 1000
+#define CONTROL_HZ 1000L
 
 // TODO: tune on the real rig. Units: PWM duty per encoder count.
 #define PID_KP 1.0f
