@@ -9,12 +9,12 @@ OBJCOPY = avr-objcopy
 CFLAGS  = -mmcu=$(MCU) -DF_CPU=$(F_CPU) -std=c11 -Os -Wall -Wextra
 LDLIBS  = -lm
 
-SRC   = main.c motor.c
+SRC   = main.c motor.c smc3.c
 BUILD = build
 
 all: $(BUILD)/firmware.hex
 
-$(BUILD)/firmware.elf: $(SRC) config.h motor.h | $(BUILD)
+$(BUILD)/firmware.elf: $(SRC) config.h motor.h smc3.h | $(BUILD)
 	$(CC) $(CFLAGS) $(SRC) -o $@ $(LDLIBS)
 	avr-size --mcu=$(MCU) $@
 
@@ -27,7 +27,10 @@ $(BUILD):
 flash: $(BUILD)/firmware.hex
 	avrdude -p $(MCU) -c arduino -P $(PORT) -b $(UPLOAD_BAUD) -U flash:w:$<:i
 
+test:
+	python3 scripts/test_smc3.py -v
+
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: all flash clean
+.PHONY: all flash test clean

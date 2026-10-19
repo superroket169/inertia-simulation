@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "motor.h"
+#include "smc3.h"
 
 _Static_assert(F_CPU / 64 / CONTROL_HZ - 1 <= 255, "CONTROL_HZ too low for Timer2 /64");
 
@@ -55,48 +56,17 @@ static void encoder_zero(uint8_t axis)
 }
 
 // ---- Serial: SMC3 frames from FlyPT Mover ----
-//
-// Frame: '[' axis hi lo ']'  with axis 'A' or 'B', value big-endian.
-// Mover template: [A<R0.A1.B>][B<R0.A2.B>]
 
 static volatile uint16_t target_raw[AXIS_COUNT];
 static volatile bool frame_received;
 
 ISR(USART_RX_vect)
 {
-    static uint8_t state;
-    static uint8_t axis;
-    static uint16_t value;
+    static Smc3Parser parser;
 
-    uint8_t c = UDR0;
-
-    switch (state) {
-    case 0:
-        if (c == '[') state = 1;
-        break;
-    case 1:
-        if (c == 'A' || c == 'B') {
-            axis = c - 'A';
-            state = 2;
-        } else {
-            state = 0;
-        }
-        break;
-    case 2:
-        value = (uint16_t)c << 8;
-        state = 3;
-        break;
-    case 3:
-        value |= c;
-        state = 4;
-        break;
-    case 4:
-        if (c == ']') {
-            target_raw[axis] = value;
-            frame_received = true;
-        }
-        state = 0;
-        break;
+    if (smc3_feed(&parser, UDR0)) {
+        target_raw[parser.axis] = parser.value;
+        frame_received = true;
     }
 }
 
