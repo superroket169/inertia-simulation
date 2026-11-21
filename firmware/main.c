@@ -16,28 +16,32 @@ _Static_assert(F_CPU / 64 / CONTROL_HZ - 1 <= 255, "CONTROL_HZ too low for Timer
 static volatile int32_t enc_count[AXIS_COUNT];
 
 // x2 decoding: interrupt on every edge of channel A, channel B gives direction.
+// Channel A on PORTD (INT0/INT1), channel B on PORTC.
 // TODO: confirm sign on the rig (swap B wires or flip here).
 ISR(INT0_vect)
 {
-    uint8_t p = PIND;
-    bool a = p & _BV(ENC0_A_BIT);
-    bool b = p & _BV(ENC0_B_BIT);
+    bool a = PIND & _BV(ENC0_A_BIT);
+    bool b = PINC & _BV(ENC0_B_BIT);
     enc_count[0] += (a == b) ? 1 : -1;
 }
 
 ISR(INT1_vect)
 {
-    uint8_t p = PIND;
-    bool a = p & _BV(ENC1_A_BIT);
-    bool b = p & _BV(ENC1_B_BIT);
+    bool a = PIND & _BV(ENC1_A_BIT);
+    bool b = PINC & _BV(ENC1_B_BIT);
     enc_count[1] += (a == b) ? 1 : -1;
 }
 
 static void encoder_init(void)
 {
-    uint8_t mask = _BV(ENC0_A_BIT) | _BV(ENC1_A_BIT) | _BV(ENC0_B_BIT) | _BV(ENC1_B_BIT);
-    DDRD &= ~mask;
-    PORTD |= mask; // pull-ups for open-collector encoders
+    // Pull-ups for open-collector encoders.
+    uint8_t mask_a = _BV(ENC0_A_BIT) | _BV(ENC1_A_BIT);
+    DDRD &= ~mask_a;
+    PORTD |= mask_a;
+
+    uint8_t mask_b = _BV(ENC0_B_BIT) | _BV(ENC1_B_BIT);
+    DDRC &= ~mask_b;
+    PORTC |= mask_b;
 
     EICRA = _BV(ISC00) | _BV(ISC10); // any edge
     EIMSK = _BV(INT0) | _BV(INT1);
@@ -133,30 +137,52 @@ static int16_t pid_step(Pid *pid, int32_t error)
     return (int16_t)out;
 }
 
-// ---- Safety inputs ----
+// ---- Panel: HOA selector per axis, driver enable ----
 
-static void inputs_init(void)
+static void panel_init(void)
 {
-    DDRB &= ~_BV(HOA_AUTO_BIT);
-    HOA_AUTO_PORT |= _BV(HOA_AUTO_BIT);
+    AXIS0_AUTO_DDR &= ~_BV(AXIS0_AUTO_BIT);
+    AXIS0_AUTO_PORT |= _BV(AXIS0_AUTO_BIT);
+    AXIS0_HAND_DDR &= ~_BV(AXIS0_HAND_BIT);
+    AXIS0_HAND_PORT |= _BV(AXIS0_HAND_BIT);
+    AXIS1_AUTO_DDR &= ~_BV(AXIS1_AUTO_BIT);
+    AXIS1_AUTO_PORT |= _BV(AXIS1_AUTO_BIT);
+    AXIS1_HAND_DDR &= ~_BV(AXIS1_HAND_BIT);
+    AXIS1_HAND_PORT |= _BV(AXIS1_HAND_BIT);
 
-    DDRC &= ~(_BV(HOME0_BIT) | _BV(HOME1_BIT));
-    PORTC |= _BV(HOME0_BIT) | _BV(HOME1_BIT);
+    DRIVER_ENABLE_PORT &= ~_BV(DRIVER_ENABLE_BIT);
+    DRIVER_ENABLE_DDR |= _BV(DRIVER_ENABLE_BIT);
 }
 
-static bool hoa_is_auto(void)
+// Auto and Hand both set is not a valid selector position (e.g. both
+// lines open with pull-ups), so it does not count as Auto.
+static bool axis_is_auto(uint8_t axis)
 {
-    return !(HOA_AUTO_PIN & _BV(HOA_AUTO_BIT));
+    bool is_auto, is_hand;
+    if (axis == 0) {
+        is_auto = AXIS0_AUTO_PIN & _BV(AXIS0_AUTO_BIT);
+        is_hand = AXIS0_HAND_PIN & _BV(AXIS0_HAND_BIT);
+    } else {
+        is_auto = AXIS1_AUTO_PIN & _BV(AXIS1_AUTO_BIT);
+        is_hand = AXIS1_HAND_PIN & _BV(AXIS1_HAND_BIT);
+    }
+    return is_auto && !is_hand;
+}
+
+static void driver_enable(bool on)
+{
+    if (on) DRIVER_ENABLE_PORT |= _BV(DRIVER_ENABLE_BIT);
+    else DRIVER_ENABLE_PORT &= ~_BV(DRIVER_ENABLE_BIT);
 }
 
 // ---- Main ----
 
 typedef enum {
-    STATE_DISABLED, // HOA not in auto, motors off
-    STATE_HOMING,
-    STATE_RUNNING,
-    STATE_FAULT,    // latched until HOA leaves auto
-} RigState;
+    AXIS_DISABLED, // not in Auto: PWM 0, the panel owns the axis
+    AXIS_HOMING,
+    AXIS_RUNNING,
+    AXIS_FAULT,    // latched until the axis leaves Auto
+} AxisState;
 
 int main(void)
 {
@@ -170,13 +196,13 @@ int main(void)
     encoder_init();
     uart_init();
     tick_init();
-    inputs_init();
+    panel_init();
 
     wdt_enable(WDTO_60MS);
     sei();
 
-    RigState state = STATE_DISABLED;
-    bool homed = false;
+    AxisState state[AXIS_COUNT] = {AXIS_DISABLED, AXIS_DISABLED};
+    bool homed[AXIS_COUNT] = {false, false};
     uint16_t frame_age_ticks = 0;
     Pid pid[AXIS_COUNT] = {0};
 
@@ -192,32 +218,35 @@ int main(void)
             frame_age_ticks++;
         }
 
-        if (!hoa_is_auto()) {
-            motor_off_all();
-            state = STATE_DISABLED;
-            continue;
+        if (frame_age_ticks > SERIAL_TIMEOUT_MS * CONTROL_HZ / 1000) {
+            // TODO: ramp slowly to center instead of holding the last target (issue #12).
         }
 
-        switch (state) {
-        case STATE_DISABLED:
-            for (uint8_t i = 0; i < AXIS_COUNT; i++) pid[i] = (Pid){0};
-            state = homed ? STATE_RUNNING : STATE_HOMING;
-            break;
+        bool any_running = false;
 
-        case STATE_HOMING:
-            // TODO: drive each axis slowly to its home switch, zero there,
-            //       then move to center. Until switches exist, power-on
-            //       position is taken as center.
-            for (uint8_t i = 0; i < AXIS_COUNT; i++) encoder_zero(i);
-            homed = true;
-            state = STATE_RUNNING;
-            break;
-
-        case STATE_RUNNING:
-            if (frame_age_ticks > SERIAL_TIMEOUT_MS * CONTROL_HZ / 1000) {
-                // TODO: ramp slowly to center instead of holding the last target.
+        for (uint8_t i = 0; i < AXIS_COUNT; i++) {
+            if (!axis_is_auto(i)) {
+                state[i] = AXIS_DISABLED;
+                motor_set(i, 0);
+                continue;
             }
-            for (uint8_t i = 0; i < AXIS_COUNT; i++) {
+
+            switch (state[i]) {
+            case AXIS_DISABLED:
+                pid[i] = (Pid){0};
+                state[i] = homed[i] ? AXIS_RUNNING : AXIS_HOMING;
+                break;
+
+            case AXIS_HOMING:
+                // TODO: the pinout has no home switches, so this needs an
+                //       absolute encoder (issue #6). Until then the position
+                //       at the first Auto is taken as center.
+                encoder_zero(i);
+                homed[i] = true;
+                state[i] = AXIS_RUNNING;
+                break;
+
+            case AXIS_RUNNING: {
                 int32_t pos = encoder_read(i);
                 int32_t target = raw_to_counts(target_raw_read(i));
                 int32_t error = target - pos;
@@ -227,18 +256,25 @@ int main(void)
                 bool lagging = error > FOLLOW_ERROR_FAULT_COUNTS
                     || error < -FOLLOW_ERROR_FAULT_COUNTS;
                 if (overtravel || lagging) {
-                    state = STATE_FAULT;
+                    state[i] = AXIS_FAULT;
+                    motor_set(i, 0);
                     break;
                 }
 
                 motor_set(i, pid_step(&pid[i], error));
+                break;
             }
-            if (state == STATE_FAULT) motor_off_all();
-            break;
 
-        case STATE_FAULT:
-            motor_off_all();
-            break;
+            case AXIS_FAULT:
+                motor_set(i, 0);
+                break;
+            }
+
+            if (state[i] == AXIS_RUNNING) any_running = true;
         }
+
+        // The enable line is shared by both drivers.
+        // TODO: check whether Hand mode needs it high (issue #16).
+        driver_enable(any_running);
     }
 }

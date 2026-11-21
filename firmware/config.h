@@ -5,6 +5,8 @@
 
 // All values below are placeholders until the real rig is assembled.
 
+// Axis 0 = left (panel "1"), axis 1 = right (panel "2").
+// SMC3 'A' drives axis 0, 'B' drives axis 1.
 #define AXIS_COUNT 2
 
 // ---- Serial (must match FlyPT Mover serial output settings) ----
@@ -31,8 +33,8 @@
 
 // ---- Mechanics ----
 
-// Counts per motor revolution after decoding (x2: both edges of channel A).
-// TODO: real encoder CPR.
+// Counts per motor revolution after decoding.
+// TODO: real encoder resolution (see issue #6).
 #define ENCODER_COUNTS_PER_REV (600L * 2)
 
 // Motor revolutions per output revolution (gearbox * belt).
@@ -54,43 +56,71 @@
 
 // ---- Motor output ----
 
-// Timer1 fast PWM with ICR1 as TOP: 16 MHz / (TOP + 1) = 20 kHz (inaudible).
-#define PWM_TOP 799
+// Both motor PWM pins sit on Timer0 and Timer1, both run 8 bit (TOP = 255)
+// so every pin gets the same frequency.
+//   PWM_7812HZ   fast PWM, /8          within the BTS7960 25 kHz limit, audible
+//   PWM_31372HZ  phase correct PWM, /1 inaudible, above the BTS7960 limit
+//   PWM_3921HZ   phase correct PWM, /8
+#define PWM_7812HZ  0
+#define PWM_31372HZ 1
+#define PWM_3921HZ  2
+
+#define PWM_FREQ PWM_7812HZ
+
+#define PWM_TOP 255
 
 // Cap duty while prototyping.
 #define MOTOR_DUTY_MAX (PWM_TOP * 6 / 10)
 
-// ---- Pins (Arduino Nano, ATmega328P) ----
-//
-//  D0/D1   UART (USB serial)
-//  D2      encoder 0 channel A (INT0, fixed)
-//  D3      encoder 1 channel A (INT1, fixed)
-//  D4      encoder 0 channel B
-//  D7      encoder 1 channel B
-//  D9      motor 0 PWM (OC1A, fixed)
-//  D10     motor 1 PWM (OC1B, fixed)
-//  D5/D6   motor 0 direction
-//  D11/D12 motor 1 direction
-//  D8      HOA "auto" input, active low
-//  A0/A1   home switches axis 0/1, active low
-//
-// Encoder channel B pins must stay on PORTD (read together with PIND).
+// ---- Pins (Arduino Nano, ATmega328P), see docs/PINOUT.md ----
 
-#define ENC0_A_BIT PD2
-#define ENC1_A_BIT PD3
-#define ENC0_B_BIT PD4
-#define ENC1_B_BIT PD7
+// Panel HOA selector, per axis. Active high: 1 = position selected.
+#define AXIS0_AUTO_PIN  PIND
+#define AXIS0_AUTO_PORT PORTD
+#define AXIS0_AUTO_DDR  DDRD
+#define AXIS0_AUTO_BIT  PD4 // D4
 
-#define HOA_AUTO_PIN  PINB
-#define HOA_AUTO_PORT PORTB
-#define HOA_AUTO_BIT  PB0
+#define AXIS0_HAND_PIN  PIND
+#define AXIS0_HAND_PORT PORTD
+#define AXIS0_HAND_DDR  DDRD
+#define AXIS0_HAND_BIT  PD7 // D7
 
-#define HOME0_BIT PC0
-#define HOME1_BIT PC1
+#define AXIS1_AUTO_PIN  PINB
+#define AXIS1_AUTO_PORT PORTB
+#define AXIS1_AUTO_DDR  DDRB
+#define AXIS1_AUTO_BIT  PB4 // D12
 
-#define MOTOR0_DIR1_BIT PD5
-#define MOTOR0_DIR2_BIT PD6
-#define MOTOR1_DIR1_BIT PB3
-#define MOTOR1_DIR2_BIT PB4
+#define AXIS1_HAND_PIN  PINB
+#define AXIS1_HAND_PORT PORTB
+#define AXIS1_HAND_DDR  DDRB
+#define AXIS1_HAND_BIT  PB0 // D8
+
+// Power enable for both motor drivers (R_EN/L_EN). The e-stop also cuts it.
+#define DRIVER_ENABLE_PORT PORTB
+#define DRIVER_ENABLE_DDR  DDRB
+#define DRIVER_ENABLE_BIT  PB3 // D11
+
+// BTS7960 PWM inputs. Which one is RPWM/LPWM decides the sign.
+// TODO: confirm the a/b = driver pin, 1/2 = motor reading of the pinout.
+//   axis 0: D6 (OC0A) + D9 (OC1A)
+//   axis 1: D5 (OC0B) + D10 (OC1B)
+
+// BTS7960 current sense (R_IS/L_IS), ADC channels.
+#define AXIS0_IS_A_ADC 2 // A2
+#define AXIS0_IS_B_ADC 6 // A6, analog only
+#define AXIS1_IS_A_ADC 3 // A3
+#define AXIS1_IS_B_ADC 7 // A7, analog only
+
+// Encoders, not connected yet.
+// TODO: assignment depends on issue #6.
+//   D2 (INT0), D3 (INT1), A0, A1, plus I2C on A4 (SDA) / A5 (SCL)
+#define ENC0_A_BIT PD2 // D2
+#define ENC1_A_BIT PD3 // D3
+#define ENC0_B_BIT PC0 // A0
+#define ENC1_B_BIT PC1 // A1
+
+#define LED_PORT PORTB
+#define LED_DDR  DDRB
+#define LED_BIT  PB5 // D13
 
 #endif
