@@ -74,7 +74,7 @@
 
 // ---- Pins (Arduino Nano, ATmega328P), see docs/PINOUT.md ----
 
-// Panel HOA selector, per axis. Active high: 1 = position selected.
+// Panel HOA selector, per axis. Pull-up, active low: 0 = position selected.
 #define AXIS0_AUTO_PIN  PIND
 #define AXIS0_AUTO_PORT PORTD
 #define AXIS0_AUTO_DDR  DDRD
@@ -95,10 +95,12 @@
 #define AXIS1_HAND_DDR  DDRB
 #define AXIS1_HAND_BIT  PB0 // D8
 
-// Power enable for both motor drivers (R_EN/L_EN). The e-stop also cuts it.
-#define DRIVER_ENABLE_PORT PORTB
-#define DRIVER_ENABLE_DDR  DDRB
-#define DRIVER_ENABLE_BIT  PB3 // D11
+// Motor driver power present; the e-stop cuts it. Pull-up input.
+// TODO: confirm active low (0 = power present), as on the panel inputs.
+#define DRIVER_POWER_PIN  PINB
+#define DRIVER_POWER_PORT PORTB
+#define DRIVER_POWER_DDR  DDRB
+#define DRIVER_POWER_BIT  PB3 // D11
 
 // BTS7960 PWM inputs. Which one is RPWM/LPWM decides the sign.
 // TODO: confirm the a/b = driver pin, 1/2 = motor reading of the pinout.

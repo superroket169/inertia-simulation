@@ -137,7 +137,7 @@ static int16_t pid_step(Pid *pid, int32_t error)
     return (int16_t)out;
 }
 
-// ---- Panel: HOA selector per axis, driver enable ----
+// ---- Panel: HOA selector per axis, driver power ----
 
 static void panel_init(void)
 {
@@ -150,35 +150,34 @@ static void panel_init(void)
     AXIS1_HAND_DDR &= ~_BV(AXIS1_HAND_BIT);
     AXIS1_HAND_PORT |= _BV(AXIS1_HAND_BIT);
 
-    DRIVER_ENABLE_PORT &= ~_BV(DRIVER_ENABLE_BIT);
-    DRIVER_ENABLE_DDR |= _BV(DRIVER_ENABLE_BIT);
+    DRIVER_POWER_DDR &= ~_BV(DRIVER_POWER_BIT);
+    DRIVER_POWER_PORT |= _BV(DRIVER_POWER_BIT);
 }
 
-// Auto and Hand both set is not a valid selector position (e.g. both
-// lines open with pull-ups), so it does not count as Auto.
+// Auto and Hand both active is not a valid selector position, so it does
+// not count as Auto.
 static bool axis_is_auto(uint8_t axis)
 {
     bool is_auto, is_hand;
     if (axis == 0) {
-        is_auto = AXIS0_AUTO_PIN & _BV(AXIS0_AUTO_BIT);
-        is_hand = AXIS0_HAND_PIN & _BV(AXIS0_HAND_BIT);
+        is_auto = !(AXIS0_AUTO_PIN & _BV(AXIS0_AUTO_BIT));
+        is_hand = !(AXIS0_HAND_PIN & _BV(AXIS0_HAND_BIT));
     } else {
-        is_auto = AXIS1_AUTO_PIN & _BV(AXIS1_AUTO_BIT);
-        is_hand = AXIS1_HAND_PIN & _BV(AXIS1_HAND_BIT);
+        is_auto = !(AXIS1_AUTO_PIN & _BV(AXIS1_AUTO_BIT));
+        is_hand = !(AXIS1_HAND_PIN & _BV(AXIS1_HAND_BIT));
     }
     return is_auto && !is_hand;
 }
 
-static void driver_enable(bool on)
+static bool driver_powered(void)
 {
-    if (on) DRIVER_ENABLE_PORT |= _BV(DRIVER_ENABLE_BIT);
-    else DRIVER_ENABLE_PORT &= ~_BV(DRIVER_ENABLE_BIT);
+    return !(DRIVER_POWER_PIN & _BV(DRIVER_POWER_BIT));
 }
 
 // ---- Main ----
 
 typedef enum {
-    AXIS_DISABLED, // not in Auto: PWM 0, the panel owns the axis
+    AXIS_DISABLED, // not in Auto or no driver power: PWM 0
     AXIS_HOMING,
     AXIS_RUNNING,
     AXIS_FAULT,    // latched until the axis leaves Auto
@@ -222,10 +221,10 @@ int main(void)
             // TODO: ramp slowly to center instead of holding the last target (issue #12).
         }
 
-        bool any_running = false;
+        bool powered = driver_powered();
 
         for (uint8_t i = 0; i < AXIS_COUNT; i++) {
-            if (!axis_is_auto(i)) {
+            if (!powered || !axis_is_auto(i)) {
                 state[i] = AXIS_DISABLED;
                 motor_set(i, 0);
                 continue;
@@ -269,12 +268,6 @@ int main(void)
                 motor_set(i, 0);
                 break;
             }
-
-            if (state[i] == AXIS_RUNNING) any_running = true;
         }
-
-        // The enable line is shared by both drivers.
-        // TODO: check whether Hand mode needs it high (issue #16).
-        driver_enable(any_running);
     }
 }

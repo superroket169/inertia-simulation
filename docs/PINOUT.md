@@ -4,7 +4,7 @@ Axis 1 = left, axis 2 = right.
 
 ## Panel (HOA selector, per axis)
 
-Active high: 1 = position selected.
+Pull-up, active low: 0 = position selected.
 
 | Pin | Name  | Dir | Notes |
 |-----|-------|-----|-------|
@@ -12,7 +12,7 @@ Active high: 1 = position selected.
 | D7  | hand1 | in, pull-up | Left axis in Hand |
 | D12 | auto2 | in, pull-up | Right axis in Auto |
 | D8  | hand2 | in, pull-up | Right axis in Hand |
-| D11 | enable | out | R_EN/L_EN of both motor drivers; the e-stop also cuts it |
+| D11 | enable | in, pull-up | Motor driver power present; the e-stop cuts it |
 
 ## Motor drivers (BTS7960)
 
